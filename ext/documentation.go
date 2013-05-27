@@ -13,4 +13,4 @@
 // limitations under the License.
 
 // Helpers for Protocol Buffers to enable record length-delimited streaming.
-package ext;
+package ext
