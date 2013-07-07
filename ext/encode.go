@@ -15,12 +15,13 @@
 package ext
 
 import (
-	"code.google.com/p/goprotobuf/proto"
 	"io"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 // WriteDelimited encodes and dumps a message to the provided writer prefixed
-// with a 64-bit varint indicating the length of the encoded message, producing
+// with a 32-bit varint indicating the length of the encoded message, producing
 // a length-delimited record stream, which can be used to chain together
 // encoded messages of the same type together in a file.  It returns the total
 // number of bytes written and any applicable error.

@@ -15,20 +15,20 @@
 package ext
 
 import (
-	"code.google.com/p/goprotobuf/proto"
+	"encoding/binary"
 	"fmt"
 	"io"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
-// https://code.google.com/p/goprotobuf/source/browse/proto/encode.go?r=145dca00d164a4ab904098268d596823720702d0#69
-const maxVarintBytes = 10
-
 // ReadDelimited decodes a message from the provided length-delimited stream,
-// where the length is encoded as 64-bit varint prefix to the message body.
+// where the length is encoded as 32-bit varint prefix to the message body.
 // It returns the total number of bytes read and any applicable error.
 func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
-	buffer := make([]byte, maxVarintBytes)
-
+	// Per AbstractParser#parsePartialDelimitedFrom with
+	// CodedInputStream#readRawVarint32.
+	buffer := make([]byte, binary.MaxVarintLen32)
 	headerLength, err := r.Read(buffer)
 	if err != nil {
 		return headerLength, err
