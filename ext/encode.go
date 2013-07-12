@@ -15,6 +15,7 @@
 package ext
 
 import (
+	"encoding/binary"
 	"io"
 
 	"code.google.com/p/goprotobuf/proto"
@@ -31,9 +32,10 @@ func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
 		return 0, err
 	}
 
-	length := proto.EncodeVarint(uint64(len(buffer)))
+	buf := make([]byte, binary.MaxVarintLen32)
+	encodedLength := binary.PutUvarint(buf, uint64(len(buffer)))
 
-	sync, err := w.Write(length)
+	sync, err := w.Write(buf[:encodedLength])
 	if err != nil {
 		return sync, err
 	}
