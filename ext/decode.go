@@ -40,7 +40,12 @@ func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
 	messageLength, syncLength := proto.DecodeVarint(buffer)
 	buffer = buffer[syncLength:]
 
-	remainder := make([]byte, int(messageLength)-len(buffer))
+	remainderBufSize := int(messageLength) - len(buffer)
+	if remainderBufSize <= 0 {
+		return headerLength, proto.Unmarshal(buffer, m)
+	}
+
+	remainder := make([]byte, remainderBufSize)
 	remainderLength, err := r.Read(remainder)
 	if err != nil {
 		return headerLength + remainderLength, err
