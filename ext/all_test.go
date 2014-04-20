@@ -16,6 +16,7 @@ package ext
 
 import (
 	"bytes"
+	"io"
 	"testing"
 	"testing/quick"
 
@@ -39,18 +40,23 @@ func TestDelimited(t *testing.T) {
 
 		reference, err := Marshal(input)
 		if err != nil {
+			t.Fatal(err)
 			return false
 		}
 
-		var buffer bytes.Buffer
+		var buf DelimitedBuffer
 		var written int
 
-		for i := 0; i < x%100; i++ {
-			n, err := WriteDelimited(&buffer, input)
+		ents := x % 100
+
+		for i := 0; i < ents; i++ {
+			n, err := buf.Marshal(input)
 			if err != nil {
+				t.Fatal(err)
 				return false
 			}
 			if n < len(reference) {
+				t.Fatal(err)
 				return false
 			}
 
@@ -59,19 +65,22 @@ func TestDelimited(t *testing.T) {
 
 		var read int
 
-		for i := 0; i < x%100; i++ {
-			output := &GoTest{}
-			n, err := ReadDelimited(&buffer, output)
+		for i := 0; i < ents; i++ {
+			output := new(GoTest)
+			n, err := buf.Unmarshal(output)
 			if err != nil {
+				t.Fatal(err)
 				return false
 			}
 
 			raw, err := Marshal(output)
 			if err != nil {
+				t.Fatal(err)
 				return false
 			}
 
 			if !bytes.Equal(reference, raw) {
+				t.Fatal("not equal")
 				return false
 			}
 
@@ -79,6 +88,7 @@ func TestDelimited(t *testing.T) {
 		}
 
 		if written != read {
+			t.Fatalf("read != written %d %d %d ", written, read, ents)
 			return false
 		}
 
@@ -87,5 +97,139 @@ func TestDelimited(t *testing.T) {
 
 	if err := quick.Check(check, nil); err != nil {
 		t.Error(err)
+	}
+}
+
+func BenchmarkRawMarshal(b *testing.B) {
+	m := initGoTest(true)
+	buf := new(bytes.Buffer)
+	for i := 0; i < b.N; i++ {
+		WriteDelimited(buf, m)
+		buf.Reset()
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		WriteDelimited(buf, m)
+		if len(buf.Bytes()) != 184 {
+			b.Fatalf("unexpected length: %d", len(buf.Bytes()))
+		}
+		buf.Reset()
+	}
+}
+
+func BenchmarkReusedMarshal(b *testing.B) {
+	m := initGoTest(true)
+	bb := new(DelimitedBuffer)
+	for i := 0; i < b.N; i++ {
+		bb.Marshal(m)
+		bb.Clear()
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		bb.Marshal(m)
+		if len(bb.Bytes()) != 184 {
+			b.Fatalf("unexpected length: %d", len(bb.Bytes()))
+		}
+		bb.Clear()
+	}
+}
+
+func BenchmarkRawUnmarshal(b *testing.B) {
+	m := initGoTest(true)
+	buf := new(bytes.Buffer)
+	WriteDelimited(buf, m)
+	out := buf.Bytes()
+	d := new(GoTest)
+	bufs := make([]*bytes.Buffer, b.N)
+	for i := 0; i < b.N; i++ {
+		bufs[i] = bytes.NewBuffer(out)
+	}
+	for i := 0; i < b.N; i++ {
+		ReadDelimited(bufs[i], d)
+	}
+	for i := 0; i < b.N; i++ {
+		bufs[i] = bytes.NewBuffer(out)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ReadDelimited(bufs[i], d)
+	}
+}
+
+func BenchmarkReusedUnmarshal(b *testing.B) {
+	m := initGoTest(true)
+	buf := new(bytes.Buffer)
+	WriteDelimited(buf, m)
+	out := buf.Bytes()
+	d := new(GoTest)
+	dec := new(DelimitedBuffer)
+	bufs := make([][]byte, b.N)
+	for i := 0; i < b.N; i++ {
+		bufs[i] = out
+	}
+	for i := 0; i < b.N; i++ {
+		dec.SetBuf(bufs[i])
+		if _, err := dec.Unmarshal(d); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		dec.SetBuf(bufs[i])
+		if _, err := dec.Unmarshal(d); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkReusedUnmarshalRepeating(b *testing.B) {
+	m := initGoTest(true)
+	buf := new(bytes.Buffer)
+	for i := 0; i < b.N; i++ {
+		WriteDelimited(buf, m)
+	}
+	out := buf.Bytes()
+	d := new(GoTest)
+	dec := new(DelimitedBuffer)
+	dec.SetBuf(out)
+	deced := 0
+outer:
+	for {
+		_, err := dec.Unmarshal(d)
+		deced++
+		switch err {
+		case io.EOF:
+			break outer
+		case nil:
+			continue
+		default:
+			b.Fatal(err)
+		}
+	}
+
+	b.ResetTimer()
+
+	dec.SetBuf(out)
+	deced = 0
+outer2:
+	for {
+		_, err := dec.Unmarshal(d)
+		deced++
+		switch err {
+		case io.EOF:
+			break outer2
+		case nil:
+			continue
+		default:
+			b.Fatal(err)
+		}
 	}
 }

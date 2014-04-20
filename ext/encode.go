@@ -26,7 +26,11 @@ import (
 // a length-delimited record stream, which can be used to chain together
 // encoded messages of the same type together in a file.  It returns the total
 // number of bytes written and any applicable error.
+//
+// This API is slated for removal.
 func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
+	deprWriteDelimited()
+
 	buffer, err := proto.Marshal(m)
 	if err != nil {
 		return 0, err

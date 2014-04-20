@@ -25,7 +25,11 @@ import (
 // ReadDelimited decodes a message from the provided length-delimited stream,
 // where the length is encoded as 32-bit varint prefix to the message body.
 // It returns the total number of bytes read and any applicable error.
+//
+// This API is slated for removal.
 func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
+	deprReadDelimited()
+
 	// Per AbstractParser#parsePartialDelimitedFrom with
 	// CodedInputStream#readRawVarint32.
 	buffer := make([]byte, binary.MaxVarintLen32)
