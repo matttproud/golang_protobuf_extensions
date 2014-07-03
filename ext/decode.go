@@ -16,11 +16,13 @@ package ext
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
 
 	"code.google.com/p/goprotobuf/proto"
 )
+
+var errInvalidVarint = errors.New("invalid varint32 encountered")
 
 // ReadDelimited decodes a message from the provided length-delimited stream,
 // where the length is encoded as 32-bit varint prefix to the message body.
@@ -28,33 +30,40 @@ import (
 func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
 	// Per AbstractParser#parsePartialDelimitedFrom with
 	// CodedInputStream#readRawVarint32.
-	buffer := make([]byte, binary.MaxVarintLen32)
-	headerLength, err := r.Read(buffer)
+	headerBuf := make([]byte, binary.MaxVarintLen32)
+	var bytesRead, varIntBytes int
+	var messageLength uint64
+	for varIntBytes == 0 {
+		if bytesRead >= len(headerBuf) {
+			return bytesRead, errInvalidVarint
+		}
+		newBytesRead, err := r.Read(headerBuf[bytesRead:])
+		if newBytesRead == 0 {
+			if err != nil {
+				return bytesRead, err
+			}
+			// A Reader should not return (0, nil), but if it does,
+			// it should be treated as no-op (according to the
+			// Reader contract). So let's go on...
+			continue
+		}
+		bytesRead += newBytesRead
+		messageLength, varIntBytes = proto.DecodeVarint(headerBuf)
+	}
+
+	headerBuf = headerBuf[varIntBytes:] // Need to process what's not used yet in headerBuf.
+
+	if messageLength-uint64(len(headerBuf)) <= 0 {
+		return bytesRead, proto.Unmarshal(headerBuf, m)
+	}
+
+	messageBuf := make([]byte, messageLength)
+	copy(messageBuf, headerBuf)
+	newBytesRead, err := io.ReadFull(r, messageBuf[len(headerBuf):])
+	bytesRead += newBytesRead
 	if err != nil {
-		return headerLength, err
-	}
-	if headerLength == 0 || int(buffer[0]) == -1 {
-		return headerLength, io.EOF
+		return bytesRead, err
 	}
 
-	messageLength, syncLength := proto.DecodeVarint(buffer)
-	buffer = buffer[syncLength:]
-
-	remainderBufSize := int(messageLength) - len(buffer)
-	if remainderBufSize <= 0 {
-		return headerLength, proto.Unmarshal(buffer, m)
-	}
-
-	remainder := make([]byte, remainderBufSize)
-	remainderLength, err := r.Read(remainder)
-	if err != nil {
-		return headerLength + remainderLength, err
-	}
-	if len(buffer)+len(remainder) != int(messageLength) {
-		return headerLength + remainderLength, fmt.Errorf("truncated message")
-	}
-
-	buffer = append(buffer, remainder...)
-
-	return headerLength + remainderLength, proto.Unmarshal(buffer, m)
+	return bytesRead, proto.Unmarshal(messageBuf, m)
 }
