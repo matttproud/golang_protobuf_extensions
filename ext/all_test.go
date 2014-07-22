@@ -87,18 +87,16 @@ func TestReadDelimited(t *testing.T) {
 		n   int
 		err error
 	}{
-		// TODO(br): Uncomment pending end-to-end fix.
-		//
-		// {
-		// 	BUF: []byte{0},
-		// 	msg: &Empty{},
-		// 	n: 1,
-		// },
-		// {
-		// 	n: 3,
-		// 	buf: []byte{2, 8, 1},
-		// 	msg: &GoEnum{Foo: FOO_FOO1.Enum()},
-		// },
+		{
+			buf: []byte{0},
+			msg: &Empty{},
+			n:   1,
+		},
+		{
+			n:   3,
+			buf: []byte{2, 8, 1},
+			msg: &GoEnum{Foo: FOO_FOO1.Enum()},
+		},
 		{
 			buf: []byte{141, 2, 10, 138, 2, 84, 104, 105, 115, 32, 105, 115, 32, 109,
 				121, 32, 103, 105, 103, 97, 110, 116, 105, 99, 44, 32, 117, 110, 104,
@@ -139,47 +137,41 @@ I expect it may.  Let's hope you enjoy testing as much as we do.`),
 }
 
 func TestEndToEndValid(t *testing.T) {
-	for _, test := range []struct {
-		msgs []Message
-	}{
-		{
-			// TODO(br): Uncomment pending end-to-end fix.
-			//
-			// []Message{&Empty{}},
-			// []Message{&GoEnum{Foo: FOO_FOO1.Enum()}, &Empty{}, &GoEnum{Foo: FOO_FOO1.Enum()}},
-			// []Message{&GoEnum{Foo: FOO_FOO1.Enum()}},
-			[]Message{&Strings{
-				StringField: String(`This is my gigantic, unhappy string.  It exceeds
+	for _, test := range [][]Message{
+		[]Message{&Empty{}},
+		[]Message{&GoEnum{Foo: FOO_FOO1.Enum()}, &Empty{}, &GoEnum{Foo: FOO_FOO1.Enum()}},
+		[]Message{&GoEnum{Foo: FOO_FOO1.Enum()}},
+		[]Message{&Strings{
+			StringField: String(`This is my gigantic, unhappy string.  It exceeds
 the encoding size of a single byte varint.  We are using it to fuzz test the
 correctness of the header decoding mechanisms, which may prove problematic.
 I expect it may.  Let's hope you enjoy testing as much as we do.`),
-			}},
-		},
+		}},
 	} {
 		var buf bytes.Buffer
 		var written int
-		for i, msg := range test.msgs {
+		for i, msg := range test {
 			n, err := WriteDelimited(&buf, msg)
 			if err != nil {
 				// Assumption: TestReadDelimited and TestWriteDelimited are sufficient
 				//             and inputs for this test are explicitly exercised there.
-				t.Fatalf("WriteDelimited(buf, %v[%d]) = ?, %v; wanted ?, nil", test.msgs, i, err)
+				t.Fatalf("WriteDelimited(buf, %v[%d]) = ?, %v; wanted ?, nil", test, i, err)
 			}
 			written += n
 		}
 		var read int
-		for i, msg := range test.msgs {
+		for i, msg := range test {
 			out := Clone(msg)
 			out.Reset()
 			n, _ := ReadDelimited(&buf, out)
 			// Decide to do EOF checking?
 			read += n
 			if !Equal(out, msg) {
-				t.Fatalf("out = %v; want %v[%d] = %#v", out, test.msgs, i, msg)
+				t.Fatalf("out = %v; want %v[%d] = %#v", out, test, i, msg)
 			}
 		}
 		if read != written {
-			t.Fatalf("%v read = %d; want %d", test.msgs, read, written)
+			t.Fatalf("%v read = %d; want %d", test, read, written)
 		}
 	}
 }
