@@ -25,7 +25,8 @@ import (
 // with a 32-bit varint indicating the length of the encoded message, producing
 // a length-delimited record stream, which can be used to chain together
 // encoded messages of the same type together in a file.  It returns the total
-// number of bytes written and any applicable error.
+// number of bytes written and any applicable error.  This is roughly
+// equivalent to the companion Java API's MessageLite#writeDelimitedTo.
 func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
 	buffer, err := proto.Marshal(m)
 	if err != nil {

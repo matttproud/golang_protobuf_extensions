@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Helpers for Protocol Buffers to enable record length-delimited streaming.
+// Package ext enables record length-delimited Protocol Buffer streaming.
 package ext

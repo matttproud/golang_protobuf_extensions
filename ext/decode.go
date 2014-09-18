@@ -25,14 +25,16 @@ import (
 var errInvalidVarint = errors.New("invalid varint32 encountered")
 
 // ReadDelimited decodes a message from the provided length-delimited stream,
-// where the length is encoded as 32-bit varint prefix to the message body. It
-// returns the total number of bytes read and any applicable error. As per the
-// reader contract, this function calls r.Read repeatedly as required until
-// exactly one message including its prefix is read and decoded (or an error has
-// occurred). The function never reads more bytes from the stream than
-// required. The function never returns an error if a message has been read and
-// decoded correctly, even if the end of the stream has been reached in doing
-// so. In that case, any subsequent calls return (0, io.EOF).
+// where the length is encoded as 32-bit varint prefix to the message body.
+// It returns the total number of bytes read and any applicable error.  This is
+// roughly equivalent to the companion Java API's
+// MessageLite#parseDelimitedFrom.  As per the reader contract, this function
+// calls r.Read repeatedly as required until exactly one message including its
+// prefix is read and decoded (or an error has occurred).  The function never
+// reads more bytes from the stream than required.  The function never returns
+// an error if a message has been read and decoded correctly, even if the end
+// of the stream has been reached in doing so.  In that case, any subsequent
+// calls return (0, io.EOF).
 func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
 	// Per AbstractParser#parsePartialDelimitedFrom with
 	// CodedInputStream#readRawVarint32.
