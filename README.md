@@ -10,7 +10,7 @@ streaming.
 
 Because [Code Review 9102043](https://codereview.appspot.com/9102043/) is
 destined to never be merged into mainline (i.e., never be promoted to formal
-[goprotobuf features](https://code.google.com/p/goprotobuf)), this repository
+[goprotobuf features](https://github.com/golang/protobuf)), this repository
 will live here in the wild.
 
 # Documentation
