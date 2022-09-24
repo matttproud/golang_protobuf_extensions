@@ -1,7 +1,7 @@
 # Overview
-This repository provides various Protocol Buffer extensions for the Go
-language (golang), namely support for record length-delimited message
-streaming.
+This repository provides various Protocol Buffer feature extensions for the Go
+programming language (golang), namely support for record length-delimited 
+message streaming.
 
 | Java                           | Go                    |
 | ------------------------------ | --------------------- |

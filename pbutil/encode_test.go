@@ -19,33 +19,25 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/google/go-cmp/cmp"
+	"github.com/matttproud/golang_protobuf_extensions/testdata"
+	"google.golang.org/protobuf/proto"
 )
 
-var errMarshal = errors.New("pbutil: can't marshal")
-
-type cantMarshal struct{ proto.Message }
-
-func (cantMarshal) Marshal() ([]byte, error) { return nil, errMarshal }
-
-var _ proto.Message = cantMarshal{}
-
 func TestWriteDelimitedMarshalErr(t *testing.T) {
-	t.Parallel()
-	var data cantMarshal
+	// data will not successfully marshal due to required field not being set,
+	// but with the way that package proto is designed at the moment this only
+	// matches on a coarse-grained error type.
+	data := new(testdata.Required)
 	var buf bytes.Buffer
 	n, err := WriteDelimited(&buf, data)
-	if got, want := n, 0; got != want {
-		t.Errorf("WriteDelimited(buf, %#v) = %#v, ?; want = %v#, ?", data, got, want)
+	if got, want := n, 0; !cmp.Equal(got, want) {
+		t.Errorf("WriteDelimited(buf, %#v) = %#v, ?; want = %#v, ?", data, got, want)
 	}
-	if got, want := err, errMarshal; got != want {
+	if got, want := err, proto.Error; !errors.Is(got, want) {
 		t.Errorf("WriteDelimited(buf, %#v) = ?, %#v; want = ?, %#v", data, got, want)
 	}
 }
-
-type canMarshal struct{ proto.Message }
-
-func (canMarshal) Marshal() ([]byte, error) { return []byte{0, 1, 2, 3, 4, 5}, nil }
 
 var errWrite = errors.New("pbutil: can't write")
 
@@ -54,14 +46,13 @@ type cantWrite struct{}
 func (cantWrite) Write([]byte) (int, error) { return 0, errWrite }
 
 func TestWriteDelimitedWriteErr(t *testing.T) {
-	t.Parallel()
-	var data canMarshal
+	data := new(testdata.Record)
 	var buf cantWrite
 	n, err := WriteDelimited(buf, data)
-	if got, want := n, 0; got != want {
-		t.Errorf("WriteDelimited(buf, %#v) = %#v, ?; want = %v#, ?", data, got, want)
+	if got, want := n, 0; !cmp.Equal(got, want) {
+		t.Errorf("WriteDelimited(buf, %#v) = %#v, ?; want = %#v, ?", data, got, want)
 	}
-	if got, want := err, errWrite; got != want {
+	if got, want := err, errWrite; !errors.Is(got, want) {
 		t.Errorf("WriteDelimited(buf, %#v) = ?, %#v; want = ?, %#v", data, got, want)
 	}
 }
