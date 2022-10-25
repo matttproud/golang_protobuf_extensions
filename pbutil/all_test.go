@@ -16,40 +16,46 @@ package pbutil
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 
-	. "github.com/matttproud/golang_protobuf_extensions/testdata"
+	"github.com/google/go-cmp/cmp"
+	"github.com/matttproud/golang_protobuf_extensions/testdata"
 )
 
 func TestWriteDelimited(t *testing.T) {
-	t.Parallel()
 	for _, test := range []struct {
-		msg proto.Message
-		buf []byte
-		n   int
-		err error
+		name string
+		msg  proto.Message
+		buf  []byte
+		n    int
+		err  error
 	}{
 		{
-			msg: &Empty{},
-			n:   1,
-			buf: []byte{0},
+			name: "empty",
+			msg:  new(testdata.Record),
+			n:    1,
+			buf:  []byte{0},
 		},
 		{
-			msg: &GoEnum{Foo: FOO_FOO1.Enum()},
-			n:   3,
-			buf: []byte{2, 8, 1},
+			name: "firstfield",
+			msg:  &testdata.Record{First: proto.Uint64(1)},
+			n:    3,
+			buf:  []byte{2, 8, 1},
 		},
 		{
-			msg: &Strings{
-				StringField: proto.String(`This is my gigantic, unhappy string.  It exceeds
+			name: "thirdfield",
+			msg: &testdata.Record{
+				Third: proto.String(`This is my gigantic, unhappy string.  It exceeds
 the encoding size of a single byte varint.  We are using it to fuzz test the
 correctness of the header decoding mechanisms, which may prove problematic.
 I expect it may.  Let's hope you enjoy testing as much as we do.`),
 			},
 			n: 271,
-			buf: []byte{141, 2, 10, 138, 2, 84, 104, 105, 115, 32, 105, 115, 32, 109,
+			buf: []byte{141, 2, 26, 138, 2, 84, 104, 105, 115, 32, 105, 115, 32, 109,
 				121, 32, 103, 105, 103, 97, 110, 116, 105, 99, 44, 32, 117, 110, 104,
 				97, 112, 112, 121, 32, 115, 116, 114, 105, 110, 103, 46, 32, 32, 73,
 				116, 32, 101, 120, 99, 101, 101, 100, 115, 10, 116, 104, 101, 32, 101,
@@ -69,36 +75,42 @@ I expect it may.  Let's hope you enjoy testing as much as we do.`),
 				109, 117, 99, 104, 32, 97, 115, 32, 119, 101, 32, 100, 111, 46},
 		},
 	} {
-		var buf bytes.Buffer
-		if n, err := WriteDelimited(&buf, test.msg); n != test.n || err != test.err {
-			t.Fatalf("WriteDelimited(buf, %#v) = %v, %v; want %v, %v", test.msg, n, err, test.n, test.err)
-		}
-		if out := buf.Bytes(); !bytes.Equal(out, test.buf) {
-			t.Fatalf("WriteDelimited(buf, %#v); buf = %v; want %v", test.msg, out, test.buf)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			// TODO: Split out error arm in next patch version.
+			if n, err := WriteDelimited(&buf, test.msg); !cmp.Equal(n, test.n) || !errors.Is(err, test.err) {
+				t.Errorf("WriteDelimited(buf, %#v) = %v, %v; want %v, %v", test.msg, n, err, test.n, test.err)
+			}
+			if out := buf.Bytes(); !cmp.Equal(out, test.buf) {
+				t.Errorf("WriteDelimited(buf, %#v); buf = %v; want %v", test.msg, out, test.buf)
+			}
+		})
 	}
 }
 
 func TestReadDelimited(t *testing.T) {
-	t.Parallel()
 	for _, test := range []struct {
-		buf []byte
-		msg proto.Message
-		n   int
-		err error
+		name string
+		buf  []byte
+		msg  proto.Message
+		n    int
+		err  error
 	}{
 		{
-			buf: []byte{0},
-			msg: &Empty{},
-			n:   1,
+			name: "empty",
+			buf:  []byte{0},
+			msg:  new(testdata.Record),
+			n:    1,
 		},
 		{
-			n:   3,
-			buf: []byte{2, 8, 1},
-			msg: &GoEnum{Foo: FOO_FOO1.Enum()},
+			name: "firstfield",
+			n:    3,
+			buf:  []byte{2, 8, 1},
+			msg:  &testdata.Record{First: proto.Uint64(1)},
 		},
 		{
-			buf: []byte{141, 2, 10, 138, 2, 84, 104, 105, 115, 32, 105, 115, 32, 109,
+			name: "thirdfield",
+			buf: []byte{141, 2, 26, 138, 2, 84, 104, 105, 115, 32, 105, 115, 32, 109,
 				121, 32, 103, 105, 103, 97, 110, 116, 105, 99, 44, 32, 117, 110, 104,
 				97, 112, 112, 121, 32, 115, 116, 114, 105, 110, 103, 46, 32, 32, 73,
 				116, 32, 101, 120, 99, 101, 101, 100, 115, 10, 116, 104, 101, 32, 101,
@@ -116,8 +128,8 @@ func TestReadDelimited(t *testing.T) {
 				116, 39, 115, 32, 104, 111, 112, 101, 32, 121, 111, 117, 32, 101, 110,
 				106, 111, 121, 32, 116, 101, 115, 116, 105, 110, 103, 32, 97, 115, 32,
 				109, 117, 99, 104, 32, 97, 115, 32, 119, 101, 32, 100, 111, 46},
-			msg: &Strings{
-				StringField: proto.String(`This is my gigantic, unhappy string.  It exceeds
+			msg: &testdata.Record{
+				Third: proto.String(`This is my gigantic, unhappy string.  It exceeds
 the encoding size of a single byte varint.  We are using it to fuzz test the
 correctness of the header decoding mechanisms, which may prove problematic.
 I expect it may.  Let's hope you enjoy testing as much as we do.`),
@@ -125,54 +137,75 @@ I expect it may.  Let's hope you enjoy testing as much as we do.`),
 			n: 271,
 		},
 	} {
-		msg := proto.Clone(test.msg)
-		msg.Reset()
-		if n, err := ReadDelimited(bytes.NewBuffer(test.buf), msg); n != test.n || err != test.err {
-			t.Fatalf("ReadDelimited(%v, msg) = %v, %v; want %v, %v", test.buf, n, err, test.n, test.err)
-		}
-		if !proto.Equal(msg, test.msg) {
-			t.Fatalf("ReadDelimited(%v, msg); msg = %v; want %v", test.buf, msg, test.msg)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			msg := proto.Clone(test.msg)
+			proto.Reset(msg)
+			// TODO: Split out error arm in next patch version.
+			if n, err := ReadDelimited(bytes.NewBuffer(test.buf), msg); !cmp.Equal(n, test.n) || !errors.Is(err, test.err) {
+				t.Errorf("ReadDelimited(%v, msg) = %v, %v; want %v, %v", test.buf, n, err, test.n, test.err)
+			}
+			if !cmp.Equal(msg, test.msg, protocmp.Transform()) {
+				t.Errorf("ReadDelimited(%v, msg); msg = %v; want %v", test.buf, msg, test.msg)
+			}
+		})
 	}
 }
 
 func TestEndToEndValid(t *testing.T) {
-	t.Parallel()
-	for _, test := range [][]proto.Message{
-		{&Empty{}},
-		{&GoEnum{Foo: FOO_FOO1.Enum()}, &Empty{}, &GoEnum{Foo: FOO_FOO1.Enum()}},
-		{&GoEnum{Foo: FOO_FOO1.Enum()}},
-		{&Strings{
-			StringField: proto.String(`This is my gigantic, unhappy string.  It exceeds
+	for _, test := range []struct {
+		name string
+		data []proto.Message
+	}{
+		{
+			name: "empty",
+			data: []proto.Message{new(testdata.Record)},
+		},
+		{
+			name: "simpleseq",
+			data: []proto.Message{&testdata.Record{First: proto.Uint64(1)}, new(testdata.Record), &testdata.Record{First: proto.Uint64(1)}},
+		},
+		{
+			name: "singleton",
+			data: []proto.Message{&testdata.Record{First: proto.Uint64(1)}},
+		},
+		{
+			name: "headerlength",
+			data: []proto.Message{&testdata.Record{
+				Third: proto.String(`This is my gigantic, unhappy string.  It exceeds
 the encoding size of a single byte varint.  We are using it to fuzz test the
 correctness of the header decoding mechanisms, which may prove problematic.
 I expect it may.  Let's hope you enjoy testing as much as we do.`),
-		}},
+			}},
+		},
 	} {
-		var buf bytes.Buffer
-		var written int
-		for i, msg := range test {
-			n, err := WriteDelimited(&buf, msg)
-			if err != nil {
-				// Assumption: TestReadDelimited and TestWriteDelimited are sufficient
-				//             and inputs for this test are explicitly exercised there.
-				t.Fatalf("WriteDelimited(buf, %v[%d]) = ?, %v; wanted ?, nil", test, i, err)
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			var written int
+			for i, msg := range test.data {
+				n, err := WriteDelimited(&buf, msg)
+				if err != nil {
+					// Assumption: TestReadDelimited and TestWriteDelimited are sufficient
+					//             and inputs for this test are explicitly exercised there.
+					t.Fatalf("WriteDelimited(buf, %v[%d]) = ?, %v; wanted ?, nil", test.data, i, err)
+				}
+				written += n
 			}
-			written += n
-		}
-		var read int
-		for i, msg := range test {
-			out := proto.Clone(msg)
-			out.Reset()
-			n, _ := ReadDelimited(&buf, out)
-			// Decide to do EOF checking?
-			read += n
-			if !proto.Equal(out, msg) {
-				t.Fatalf("out = %v; want %v[%d] = %#v", out, test, i, msg)
+			var read int
+			for i, msg := range test.data {
+				out := proto.Clone(msg)
+				proto.Reset(out)
+				n, err := ReadDelimited(&buf, out)
+				read += n
+				if !cmp.Equal(out, msg, protocmp.Transform()) {
+					t.Errorf("out = %v; want %v[%d] = %#v", out, test, i, msg)
+				}
+				if got, want := err, error(nil); !errors.Is(got, want) {
+					t.Errorf("err = %v, want %v", got, want)
+				}
 			}
-		}
-		if read != written {
-			t.Fatalf("%v read = %d; want %d", test, read, written)
-		}
+			if read != written {
+				t.Errorf("%v read = %d; want %d", test, read, written)
+			}
+		})
 	}
 }
