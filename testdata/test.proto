@@ -16,7 +16,7 @@ syntax = "proto2";
 
 package testdata;
 
-option go_package = "github.com/matttproud/golang_protobuf_extensions/testdata";
+option go_package = "github.com/matttproud/golang_protobuf_extensions/v2/testdata";
 
 message Record {
   optional uint64 first = 1;

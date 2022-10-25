@@ -1,4 +1,4 @@
-module github.com/matttproud/golang_protobuf_extensions
+module github.com/matttproud/golang_protobuf_extensions/v2
 
 go 1.19
 

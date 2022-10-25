@@ -22,7 +22,7 @@ import (
 	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/matttproud/golang_protobuf_extensions/testdata"
+	"github.com/matttproud/golang_protobuf_extensions/v2/testdata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 )
