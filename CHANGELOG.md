@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.0
+
+* Update Go modules dependencies.
+* Update minimum Go version to 1.11.
+
 ## v1.0.4
 
 **Summary**: This is an emergency re-tag of v1.0.2 since v1.0.3 broke API
