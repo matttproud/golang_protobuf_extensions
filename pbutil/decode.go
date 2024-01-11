@@ -15,15 +15,40 @@
 package pbutil
 
 import (
-	"encoding/binary"
-	"errors"
 	"io"
 
+	"google.golang.org/protobuf/encoding/protodelim"
 	"google.golang.org/protobuf/proto"
 )
 
-// TODO: Give error package name prefix in next minor release.
-var errInvalidVarint = errors.New("invalid varint32 encountered")
+type countingReader struct {
+	r io.Reader
+	n int
+}
+
+// implements protodelim.Reader
+func (r *countingReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	if n > 0 {
+		r.n += n
+	}
+	return n, err
+}
+
+// implements protodelim.Reader
+func (c *countingReader) ReadByte() (byte, error) {
+	var buf [1]byte
+	for {
+		n, err := c.Read(buf[:])
+		if n == 0 && err == nil {
+			// io.Reader states: Callers should treat a return of 0 and nil as
+			// indicating that nothing happened; in particular it does not
+			// indicate EOF.
+			continue
+		}
+		return buf[0], err
+	}
+}
 
 // ReadDelimited decodes a message from the provided length-delimited stream,
 // where the length is encoded as 32-bit varint prefix to the message body.
@@ -37,45 +62,10 @@ var errInvalidVarint = errors.New("invalid varint32 encountered")
 // of the stream has been reached in doing so.  In that case, any subsequent
 // calls return (0, io.EOF).
 func ReadDelimited(r io.Reader, m proto.Message) (n int, err error) {
-	// TODO: Consider allowing the caller to specify a decode buffer in the
-	// next major version.
-
-	// TODO: Consider using error wrapping to annotate error state in pass-
-	// through cases in the next minor version.
-
-	// Per AbstractParser#parsePartialDelimitedFrom with
-	// CodedInputStream#readRawVarint32.
-	var headerBuf [binary.MaxVarintLen32]byte
-	var bytesRead, varIntBytes int
-	var messageLength uint64
-	for varIntBytes == 0 { // i.e. no varint has been decoded yet.
-		if bytesRead >= len(headerBuf) {
-			return bytesRead, errInvalidVarint
-		}
-		// We have to read byte by byte here to avoid reading more bytes
-		// than required. Each read byte is appended to what we have
-		// read before.
-		newBytesRead, err := r.Read(headerBuf[bytesRead : bytesRead+1])
-		if newBytesRead == 0 {
-			if err != nil {
-				return bytesRead, err
-			}
-			// A Reader should not return (0, nil); but if it does, it should
-			// be treated as no-op according to the Reader contract.
-			continue
-		}
-		bytesRead += newBytesRead
-		// Now present everything read so far to the varint decoder and
-		// see if a varint can be decoded already.
-		messageLength, varIntBytes = binary.Uvarint(headerBuf[:bytesRead])
+	cr := &countingReader{r: r}
+	opts := protodelim.UnmarshalOptions{
+		MaxSize: -1,
 	}
-
-	messageBuf := make([]byte, messageLength)
-	newBytesRead, err := io.ReadFull(r, messageBuf)
-	bytesRead += newBytesRead
-	if err != nil {
-		return bytesRead, err
-	}
-
-	return bytesRead, proto.Unmarshal(messageBuf, m)
+	err = opts.UnmarshalFrom(cr, m)
+	return cr.n, err
 }

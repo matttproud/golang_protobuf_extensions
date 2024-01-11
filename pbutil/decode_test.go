@@ -16,6 +16,7 @@ package pbutil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"testing"
@@ -29,29 +30,34 @@ import (
 
 func TestReadDelimitedIllegalVarint(t *testing.T) {
 	var tests = []struct {
-		in  []byte
-		n   int
-		err error
+		name string
+		in   []byte
+		n    int
 	}{
 		{
-			in:  []byte{255, 255, 255, 255, 255},
-			n:   5,
-			err: errInvalidVarint,
+			name: "all 0xFF",
+			in:   []byte{255, 255, 255, 255, 255},
+			n:    5,
 		},
+
+		// Ensure ReadDelimited eventually stops parsing a varint instead of
+		// looping as long as the input bytes have the continuation bit set.
 		{
-			in:  []byte{255, 255, 255, 255, 255, 255},
-			n:   5,
-			err: errInvalidVarint,
+			name: "infinite continuation bits",
+			in:   bytes.Repeat([]byte{255}, 2*binary.MaxVarintLen64),
+			n:    binary.MaxVarintLen64,
 		},
 	}
 	for _, test := range tests {
-		n, err := ReadDelimited(bytes.NewReader(test.in), nil)
-		if got, want := n, test.n; !cmp.Equal(got, want) {
-			t.Errorf("ReadDelimited(%#v, nil) = %#v, ?; want = %#v, ?", test.in, got, want)
-		}
-		if got, want := err, test.err; !errors.Is(got, want) {
-			t.Errorf("ReadDelimited(%#v, nil) = ?, %#v; want = ?, %#v", test.in, got, want)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			n, err := ReadDelimited(bytes.NewReader(test.in), nil)
+			if got, want := n, test.n; !cmp.Equal(got, want) {
+				t.Errorf("ReadDelimited(%#v, nil) = %#v, ?; want = %#v, ?", test.in, got, want)
+			}
+			if err == nil {
+				t.Errorf("ReadDelimited(%#v) unexpectedly did not result in an error", test.in)
+			}
+		})
 	}
 }
 
@@ -61,7 +67,7 @@ func TestReadDelimitedPrematureHeader(t *testing.T) {
 	if got, want := n, 1; !cmp.Equal(got, want) {
 		t.Errorf("ReadDelimited(%#v, nil) = %#v, ?; want = %#v, ?", data[0:1], got, want)
 	}
-	if got, want := err, io.EOF; !errors.Is(got, want) {
+	if got, want := err, io.ErrUnexpectedEOF; !errors.Is(got, want) {
 		t.Errorf("ReadDelimited(%#v, nil) = ?, %#v; want = ?, %#v", data[0:1], got, want)
 	}
 }
@@ -83,7 +89,7 @@ func TestReadDelimitedPrematureHeaderIncremental(t *testing.T) {
 	if got, want := n, 1; !cmp.Equal(got, want) {
 		t.Errorf("ReadDelimited(%#v, nil) = %#v, ?; want = %#v, ?", data[0:1], got, want)
 	}
-	if got, want := err, io.EOF; !errors.Is(got, want) {
+	if got, want := err, io.ErrUnexpectedEOF; !errors.Is(got, want) {
 		t.Errorf("ReadDelimited(%#v, nil) = ?, %#v; want = ?, %#v", data[0:1], got, want)
 	}
 }
