@@ -1,4 +1,7 @@
 # Overview
+**Note:** This Go package is on the road to retirement.  You can learn more
+at this blog post: https://matttproud.com/blog/posts/retiring-pbutil.html.
+
 This repository provides various Protocol Buffer feature extensions for the Go
 programming language (golang), namely support for record length-delimited 
 message streaming.
