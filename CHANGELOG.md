@@ -1,5 +1,11 @@
 # Changelog
 
+## Next
+
+Here are fragments to be discussed in the next release notes:
+
+* Retirement notice.
+
 ## v1.0.4
 
 **Summary**: This is an emergency re-tag of v1.0.2 since v1.0.3 broke API
