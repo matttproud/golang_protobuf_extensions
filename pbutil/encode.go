@@ -15,9 +15,9 @@
 package pbutil
 
 import (
-	"encoding/binary"
 	"io"
 
+	"google.golang.org/protobuf/encoding/protodelim"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,22 +28,5 @@ import (
 // number of bytes written and any applicable error.  This is roughly
 // equivalent to the companion Java API's MessageLite#writeDelimitedTo.
 func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
-	// TODO: Consider allowing the caller to specify an encode buffer in the
-	// next major version.
-
-	buffer, err := proto.Marshal(m)
-	if err != nil {
-		return 0, err
-	}
-
-	var buf [binary.MaxVarintLen32]byte
-	encodedLength := binary.PutUvarint(buf[:], uint64(len(buffer)))
-
-	sync, err := w.Write(buf[:encodedLength])
-	if err != nil {
-		return sync, err
-	}
-
-	n, err = w.Write(buffer)
-	return n + sync, err
+	return protodelim.MarshalTo(w, m)
 }
