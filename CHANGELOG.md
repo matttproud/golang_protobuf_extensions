@@ -1,5 +1,12 @@
 # Changelog
 
+## Next
+
+Here are fragments to be discussed in the next release notes:
+
+* Retirement notice.
+* Reimplemented in terms of `package protodelim`.
+
 ## v2.0.0
 
 **Summary**: Modernization of this package to Go standards in 2022, mostly
